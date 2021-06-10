@@ -1,24 +1,34 @@
-x = [ 1, 1, 0, 0, 0, 1, 0]
+from __future__ import annotations
+# from typing import Union
+
+class TimeVar:
+    def __init__(self, hours:int, minutes:int):
+        while minutes > 60:
+            minutes -= 60
+            hours += 1
+        self.hours = hours
+        self.minutes = minutes
+        
+        self.time_str = f'{hours}:{minutes}'
+    
+    def __str__(self):
+        return self.time_str
+    
+    def __add__(self, added_time:TimeVar):
+        hours = self.hours + added_time.hours
+        minutes = self.minutes + added_time.minutes
+        return TimeVar(self.hours + added_time.hours, self.minutes + added_time.minutes)
+    
+    @classmethod
+    def by_string(cls, time:str):
+        time_split_hour_min = time.split(":")
+        hours = int(time_split_hour_min[0])
+        minutes = int(time_split_hour_min[1])
+        return cls(hours, minutes)
 
 
-sum_all_shift_val_dec = int(''.join(map(lambda x: str(x), x)), 2)
 
-print(x)
-print(str(x))
-print(sum_all_shift_val_dec)
-
-def bool2int(x):
-    y = 0
-    for i,j in enumerate(x):
-        y += j<<i
-    return y
-
-print(bool2int(x[::-1]))
-
-from numpy import *
-a = array([[ 1, 1, 0, 0, 0, 1, 0]])
-
-b2i = 2**arange(a.shape[0]-1, -1, -1)
-
-result = (a*b2i).sum(axis=1)  #[12  4  7 15]
-print(result)
+t = TimeVar.by_string("8:30")
+r = TimeVar(2, 40)
+e = t + r
+print(f'{t} + {r} = {e}')

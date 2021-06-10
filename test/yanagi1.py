@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 
+import pandas as pd
 import numpy as np
 import printj
 from ortools.sat.python import cp_model
@@ -13,6 +14,9 @@ from printj import ColorText as ct
 
 class TimeVar:
     def __init__(self, hours: int, minutes: int):
+        while minutes > 60:
+            minutes -= 60
+            hours += 1
         self.hours = hours
         self.minutes = minutes
         self.time_str = f'{hours}:{minutes}'
@@ -44,41 +48,56 @@ class TimeVar:
 class WorkersPartialSolutionPrinter(cp_model.CpSolverSolutionCallback):
     """Print intermediate solutions."""
 
-    def __init__(self, shifts, num_workers, num_packages, num_shifts, num_keiros, sols):
+    def __init__(self, shifts, num_workers, num_packages, num_shifts, num_vehicles, sols):
         cp_model.CpSolverSolutionCallback.__init__(self)
         self._shifts = shifts
         self._num_workers = num_workers
         self._num_packages = num_packages
         self._num_shifts = num_shifts
-        self._num_keiros = num_keiros
+        self._num_vehicles = num_vehicles
         self._solutions = set(range(sols))
         self._solution_count = 0
-        self.__solution_limit = sols  # limit
+        self.__solution_limit = sols  # limit 
+        self.time_shifts = [TimeVar(6, 30) + TimeVar(0, 20*i) for i in range(num_shifts)]
 
     def on_solution_callback(self):
         alphabets = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         if self._solution_count in self._solutions:
             print('Solution %i' % self._solution_count)
+            data = []
             for p in range(self._num_packages):
                 # print('Package %i' % p)
-                for w in range(self._num_workers):
-                    is_working = False
-                    for s in range(self._num_shifts):
-                        for k in range(self._num_keiros):
-                            if self.Value(self._shifts[(w, p, k, s)]):
+                data_i = []
+                for s in range(self._num_shifts):
+                    s_val = ct.white('0 ')
+                    for w in range(self._num_workers):
+                        is_working = False
+                        for v in range(self._num_vehicles):
+                            if self.Value(self._shifts[(w, p, v, s)]):
                                 is_working = True
                                 # print('  Worker %i works shift %i' % (w, s))
                                 text_worker = ct.green(
                                     f'Worker {alphabets[w]}')
                                 # text_shift = ct.purple(f'shift {["9:00", "10:00", "11:00", "12:00", ][s]}')
-                                text_shift = ct.purple(f'shift {["9:00", "10:00", "11:00", "12:00", ][s]}')
+                                text_shift = ct.purple(f'shift {self.time_shifts[s]}')
                                 # text_shift = ct.purple(f'shift {s}')
                                 text_package = ct.cyan(f'package-{p}')
-                                text_keiro = ct.yellow(
-                                    f'keiro {["Main2", "Main1", "SUB", ][k]}')
+                                text_vehicle = ct.yellow(
+                                    f'vehicle {v}')
+                                # text_keiro = ct.yellow(
+                                #     f'keiro {["Main2", "Main1", "SUB", ][v]}')
                                 # if p in [2, 4]:
                                 print(
-                                    f'  {text_worker} at {text_shift} moves {text_package} through {text_keiro}')
+                                    f'  {text_worker} at {text_shift} moves {text_package} using {text_vehicle}')
+                                s_val = ct.green(f'{alphabets[w]}{v} ')
+                    data_i.append(s_val)
+                data.append(data_i)
+            # data = pd.DataFrame(data, columns=self.time_shifts)
+            data = pd.DataFrame(data, columns=[ct.yellow(f'  {s}') for s in self.time_shifts])
+            data.index = [f'Package-{p}' for p in range(self._num_packages)]
+            print()
+            print(data)
+                                
                     # if not is_working:
                     #     print('  Worker {} does not work'.format(w))
             print()
@@ -108,7 +127,7 @@ def main():
     #     [1, 1, 1, 1, 0, 1],
     #     [1, 1, 1, 1, 1, 0],
     #     ]
-    package_orders = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]]
+    package_orders = [[0, 1], [1, 2], ]
     # main2, main1, sub
     package_to_vehicle = np.array([
         [1, 1, 1, 1],
@@ -133,21 +152,21 @@ def main():
         [1, 1, 0],
     ])
     num_workers = len(workers_to_keiro)  # 4
-    num_packages = len(package_to_keiro)  # 5
-    num_shifts = 40
+    num_packages = len(package_to_vehicle)  # 5
+    num_shifts = 9
     num_tables = 6
-    num_keiros = 3
+    num_vehicles = len(package_to_vehicle.T)
     all_workers = range(num_workers)
     all_packages = range(num_packages)
     all_shifts = range(num_shifts)
-    all_keiros = range(num_keiros)
+    all_vehicles = range(num_vehicles)
 
     print(
-        f'\nNo. of package  {len(package_to_keiro)}, No. of workers  {len(workers_to_keiro)}')
+        f'\nNo. of package  {len(package_to_vehicle)}, No. of workers  {len(workers_to_keiro)}')
     alphabets = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     """
     available_workers_per_package = []
-    for i, item in enumerate(package_to_keiro):
+    for i, item in enumerate(package_to_vehicle):
         available_workers_list = []
         for j, table in enumerate(item):
             if table == 1:
@@ -162,8 +181,8 @@ def main():
     package_to_worker = np.matmul(package_to_keiro, workers_to_keiro.T)
     available_workers_per_package = [
         [i for i, ll in enumerate(l) if ll == 1] for l in package_to_worker]
-    available_keiros_per_package = [
-        [i for i, ll in enumerate(l) if ll == 1] for l in package_to_keiro]
+    available_vehicles_per_package = [
+        [i for i, ll in enumerate(l) if ll == 1] for l in package_to_vehicle]
 
     print()
     for p, item in enumerate(available_workers_per_package):
@@ -172,11 +191,19 @@ def main():
         text_package = ct.cyan(f'Package-{p}')
         print(f'{text_package} can be moved by {text_worker}')
     print()
-    for p, item in enumerate(available_keiros_per_package):
-        text_keiro = ct.yellow(
-            f'keiro {" ".join(["Main2", "Main1", "SUB", ][l] for l in item)}')
+    # for p, item in enumerate(available_vehicles_per_package):
+    #     text_vehicle = ct.yellow(
+    #         f'vehicle {" ".join(["Main2", "Main1", "SUB", ][l] for l in item)}')
+    #     text_package = ct.cyan(f'Package-{p}')
+    #     print(f'{text_package} can be moved to {text_vehicle}')
+    # print()
+    for p, (workers, vehicles) in enumerate(zip(available_workers_per_package, available_vehicles_per_package)):
+        text_worker = ct.green(
+            f'workers {", ".join(alphabets[l] for l in workers)}')
+        text_vehicle = ct.yellow(
+            f'vehicle {", ".join(str(v) for v in vehicles)}')
         text_package = ct.cyan(f'Package-{p}')
-        print(f'{text_package} can be moved to {text_keiro}')
+        print(f'{text_package} can be moved by \t{text_worker}\tusing {text_vehicle}')
     print()
 
     vehicle_to_worker = np.matmul(package_to_vehicle.T, package_to_worker)
@@ -185,72 +212,40 @@ def main():
     model = cp_model.CpModel()
 
     # Creates shift variables.
-    # shifts[(w, p, k, s)]: nurse 'n' works shift 's' on package 'd'.
+    # shifts[(w, p, v, s)]: nurse 'n' works shift 's' on package 'd'.
     shifts = {}
     for w in all_workers:
         for p in all_packages:
-            for k in all_keiros:
+            for v in all_vehicles:
                 for s in all_shifts:
-                    shifts[(w, p, k, s)] = model.NewBoolVar(
-                        'shift_w%ip%ik%is%i' % (w, p, k, s))
-    # for w in all_workers:
-    #     for p in all_packages:
-    #         for s in all_shifts:
-    #             shifts[(w, p, k, s)] = model.NewBoolVar('shift_w%ip%is%i' % (w, p, k, s))
-
-    # # # Each shift is assigned to exactly one nurse in the schedule period.
-    # for p in all_packages:
-    #     for s in all_shifts:
-    #         model.Add(sum(shifts[(w, p, k, s)] for w in all_workers) == 1)
+                    shifts[(w, p, v, s)] = model.NewBoolVar(
+                        'shift_w%ip%ik%is%i' % (w, p, v, s))
 
     # 1 worker needed per package
-    # for w in all_workers:
     for p in all_packages:
-        model.Add(sum(sum(sum(shifts[(w, p, k, s)] for k in all_keiros)
+        model.Add(sum(sum(sum(shifts[(w, p, v, s)] for v in all_vehicles)
                   for s in all_shifts) for w in all_workers) == 1)
-        model.Add(sum(sum(sum(shifts[(w, p, k, s)] for k in all_keiros)
+        model.Add(sum(sum(sum(shifts[(w, p, v, s)] for v in all_vehicles)
                   for s in all_shifts) for w in available_workers_per_package[p]) == 1)
 
-        model.Add(sum(sum(sum(shifts[(w, p, k, s)] for w in all_workers)
-                  for s in all_shifts) for k in available_keiros_per_package[p]) == 1)
+        model.Add(sum(sum(sum(shifts[(w, p, v, s)] for w in all_workers)
+                  for s in all_shifts) for v in available_vehicles_per_package[p]) == 1)
 
-        # for s in all_shifts:
-        #     # print(shifts[(w, p, k, s)] for k in all_keiros for w in all_workers)
-        #     aa = [workers_to_keiro[w][k]*shifts[(w, p, k ,s)] for k in all_keiros for w in all_workers]
-        #     print(aa)
-        # model.Add(sum(aa))
-
-    # for w in all_workers:
-    #     for p in all_packages:
-    #         x = [shifts[(w, p, k, s)] for s in all_shifts]
-    #         # sum_all_shift_val_dec = int(''.join(map(lambda x: str(int(x)), x)), 2)bool2int(x[::-1])
-    #         # model.Minimize(int(''.join(map(lambda x: str(x), x)), 2))
-    #         model.Minimize(bool2int(x[::-1]))
-
-    # for w in all_workers:
-    #     for p in all_packages:
-    # diag1 = []
-    # for w in all_workers:
-    #     for p in package_order:
-    #         p1 = model.NewIntVar(0, num_packages, 'pack1_%i' % p)
-    #         diag1.append(p1)
-    #         model.Add(p1 == p)
-        # for s in all_shifts:
-
+    #  package_order   # s(p=2) < s(p=4)
     for package_order in package_orders:
         shift_before = 0
         for s in all_shifts:
             for w in all_workers:
-                for k in all_keiros:
+                for v in all_vehicles:
                     # s = {0, 1, 2, 3}
-                    shift_before += shifts[(w, package_order[0], k, s)]
+                    shift_before += shifts[(w, package_order[0], v, s)]
                     shift_after = 0
-                    for s_inner in range(s, num_shifts):
+                    for s2 in range(s, num_shifts):
                         for w2 in all_workers:
-                            for k2 in all_keiros:
+                            for k2 in all_vehicles:
                                 # (4 - {0, 1, 2, 3})
                                 shift_after += shifts[(w2,
-                                                       package_order[1], k2, s_inner)]
+                                                       package_order[1], k2, s2)]
                     model.Add(shift_before <= shift_after)
                     # print(ct.yellow(f'{package_order} ')+ct.cyan(f'shift_before: ')+f'{shift_before}, '+ct.green('shift_after: ')+f'{shift_after}')
 
@@ -259,11 +254,11 @@ def main():
 
 # abc
 # d
-        # model.Add(sum(sum(shifts[(w, p, k, s)] for s in all_shifts) for w in available_workers_per_package[p]) == 1)
+        # model.Add(sum(sum(shifts[(w, p, v, s)] for s in all_shifts) for w in available_workers_per_package[p]) == 1)
     # # Each nurse works at most one shift per package.
     # for n in all_workers:
     #     for d in all_packages:
-    #         model.Add(sum(shifts[(w, p, k, s)] for s in all_shifts) <= 1)
+    #         model.Add(sum(shifts[(w, p, v, s)] for s in all_shifts) <= 1)
 
     # # Try to distribute the shifts evenly, so that each nurse works
     # # min_shifts_per_nurse shifts. If this is not possible, because the total
@@ -278,7 +273,7 @@ def main():
     #     num_shifts_worked = 0
     #     for d in all_packages:
     #         for s in all_shifts:
-    #             num_shifts_worked += shifts[(w, p, k, s)]
+    #             num_shifts_worked += shifts[(w, p, v, s)]
     #     model.Add(min_shifts_per_nurse <= num_shifts_worked)
     #     model.Add(num_shifts_worked <= max_shifts_per_nurse)
 
@@ -286,10 +281,10 @@ def main():
     solver = cp_model.CpSolver()
     solver.parameters.linearization_level = 0
     # Display the first five solutions.
-    a_few_solutions = 10000
+    a_few_solutions = 1
     solution_printer = WorkersPartialSolutionPrinter(shifts, num_workers,
                                                      num_packages, num_shifts,
-                                                     num_keiros,
+                                                     num_vehicles,
                                                      a_few_solutions)
     solver.SearchForAllSolutions(model, solution_printer)
 
