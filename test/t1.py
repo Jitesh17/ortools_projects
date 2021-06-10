@@ -28,7 +28,9 @@ class TimeVar:
 
 
 
-t = TimeVar.by_string("8:30")
-r = TimeVar(2, 40)
-e = t + r
-print(f'{t} + {r} = {e}')
+# t = TimeVar.by_string("8:30")
+# r = TimeVar(2, 40)
+# e = t + r
+# print(f'{t} + {r} = {e}')
+
+print(list("ABCD"))

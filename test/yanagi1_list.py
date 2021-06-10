@@ -127,69 +127,48 @@ def main():
     #     [1, 1, 1, 1, 0, 1],
     #     [1, 1, 1, 1, 1, 0],
     #     ]
-    printj.yellow('::::::::::::::::::::: Input :::::::::::::::::::::')
-    input_data = pd.DataFrame({
+    input_data = {
         "package": [0, 1, 2, 3, 4, 5],
         "quantity": [10, 20, 20, 30, 40, 50],
         "location": [0, 0, 0, 1, 0, 2],
         "vehicle": [[1, 2, 3, 4], [1], [1], [2, 3], [3, 4], [3, 4]],
         "next": [None, 2, 3, 4, None, None],
-    })
-    input_data_worker = pd.DataFrame({
-        "worker": list("ABCD"),
-        "location": [[0, 2], [0, 1], [0, 2], [0, 1]],
-        "vehicle": [[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]],
-    })
-        # "location": [[0, 2], [0, 1], [0, 2], [0, 1]],
-    # input_data = pd.DataFrame(input_data)
+    }
+    input_data = pd.DataFrame(input_data)
     print(input_data)
-    print(input_data_worker)
-    # df = input_data
-    package_to_keiro = pd.crosstab(index=input_data['package'], columns = input_data['location']).to_numpy()
-    package_to_vehicle = pd.DataFrame({p: [1 if v in vehicles_list else 0 for v in range(4)] for p, vehicles_list in enumerate(input_data.vehicle)}).T.to_numpy()   # num_vehicle = 4
-    keiro_to_worker = pd.DataFrame({p: [1 if v in worker_list else 0 for v in range(3)] for p, worker_list in enumerate(input_data_worker.location)}).to_numpy()   # num_keiro = 6
-    # print("package_to_vehicle",package_to_vehicle)
-    # package_orders = [[i, next_i] if next_i is not None for (i, next_i) in zip(input_data.package, input_data)]
-    package_orders = [[i,int(next_i)]  for (i, next_i) in zip(input_data.package, input_data.next) if pd.notna(next_i)]
-    # package_orders = [next_i  for next_i in input_data.next if pd.notna(next_i)]
-    print()
-    printj.yellow('::::::::::::::::::: preprocess :::::::::::::::::::')
-    print("package_to_vehicle", package_to_vehicle)
-    print("package_to_keiro", package_to_keiro)
-    print("keiro_to_worker", keiro_to_worker)
-    print("package_orders", package_orders)
-    print()
-    # print(package_to_keiro.to_numpy())
-    # sys.exit()
+    df = input_data
+    package_to_vehicle = pd.crosstab(index=df['package'], columns = df['location'])
+    print(package_to_vehicle)
+    sys.exit()
 
-    # package_orders = [[0, 1], [1, 2], ]
+    package_orders = [[0, 1], [1, 2], ]
     # main2, main1, sub
-    # package_to_vehicle = np.array([
-    #     [1, 1, 1, 1],
-    #     [1, 0, 0, 0],
-    #     [1, 0, 0, 0],
-    #     [0, 1, 1, 0],
-    #     [0, 0, 1, 1],
-    #     [0, 0, 1, 1],
-    # ])
-    # package_to_keiro = np.array([
-    #     [1, 0, 0],
-    #     [1, 0, 0],
-    #     [1, 0, 0],
-    #     [0, 1, 0],
-    #     [1, 0, 0],
-    #     [0, 0, 1],
-    # ])
-    # workers_to_keiro = np.array([
-    #     [1, 0, 1],
-    #     [1, 1, 0],
-    #     [1, 0, 1],
-    #     [1, 1, 0],
-    # ])
-    num_workers = len(input_data_worker.worker)  # 4
-    num_packages = len(input_data.package)  # 5
+    package_to_vehicle = np.array([
+        [1, 1, 1, 1],
+        [1, 0, 0, 0],
+        [1, 0, 0, 0],
+        [0, 1, 1, 0],
+        [0, 0, 1, 1],
+        [0, 0, 1, 1],
+    ])
+    package_to_keiro = np.array([
+        [1, 0, 0],
+        [1, 0, 0],
+        [1, 0, 0],
+        [0, 1, 0],
+        [1, 0, 0],
+        [0, 0, 1],
+    ])
+    workers_to_keiro = np.array([
+        [1, 0, 1],
+        [1, 1, 0],
+        [1, 0, 1],
+        [1, 1, 0],
+    ])
+    num_workers = len(workers_to_keiro)  # 4
+    num_packages = len(package_to_vehicle)  # 5
     num_shifts = 9
-    # num_tables = 6
+    num_tables = 6
     num_vehicles = len(package_to_vehicle.T)
     all_workers = range(num_workers)
     all_packages = range(num_packages)
@@ -197,7 +176,7 @@ def main():
     all_vehicles = range(num_vehicles)
 
     print(
-        f'\nNo. of package  {num_packages}, No. of workers  {num_workers}')
+        f'\nNo. of package  {len(package_to_vehicle)}, No. of workers  {len(workers_to_keiro)}')
     alphabets = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     """
     available_workers_per_package = []
@@ -213,9 +192,7 @@ def main():
     print(available_workers_per_package)
     print(np.array(available_workers_per_package))
     """
-    # package_to_worker = np.matmul(package_to_keiro, workers_to_keiro.T)
-    # print(package_to_keiro.shape, keiro_to_worker.shape)
-    package_to_worker = np.matmul(package_to_keiro, keiro_to_worker)
+    package_to_worker = np.matmul(package_to_keiro, workers_to_keiro.T)
     available_workers_per_package = [
         [i for i, ll in enumerate(l) if ll == 1] for l in package_to_worker]
     available_vehicles_per_package = [
@@ -323,7 +300,6 @@ def main():
                                                      num_packages, num_shifts,
                                                      num_vehicles,
                                                      a_few_solutions)
-    printj.yellow('::::::::::::::::::::: Output :::::::::::::::::::::')
     solver.SearchForAllSolutions(model, solution_printer)
 
     # Statistics.
