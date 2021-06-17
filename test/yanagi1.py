@@ -83,13 +83,13 @@ class WorkersPartialSolutionPrinter(cp_model.CpSolverSolutionCallback):
                                 # text_shift = ct.purple(f'shift {s}')
                                 text_package = ct.cyan(f'package-{p}')
                                 text_vehicle = ct.yellow(
-                                    f'vehicle {v}')
+                                    f'vehicle {v+1}')
                                 # text_keiro = ct.yellow(
                                 #     f'keiro {["Main2", "Main1", "SUB", ][v]}')
                                 # if p in [2, 4]:
-                                print(
-                                    f'  {text_worker} at {text_shift} moves {text_package} using {text_vehicle}')
-                                s_val = ct.green(f'{alphabets[w]}{v} ')
+                                # print(
+                                #     f'  {text_worker} at {text_shift} moves {text_package} using {text_vehicle}')
+                                s_val = ct.green(f'{alphabets[w]}{v+1} ')
                     data_i.append(s_val)
                 data.append(data_i)
             # data = pd.DataFrame(data, columns=self.time_shifts)
@@ -130,34 +130,39 @@ def main():
     printj.yellow('::::::::::::::::::::: Input :::::::::::::::::::::')
     input_data = pd.DataFrame({
         "package": [0, 1, 2, 3, 4, 5],
-        "quantity": [10, 20, 20, 30, 40, 50],
+        "quantity": [2, 2, 2, 3, 3, 3],  
         "location": [0, 0, 0, 1, 0, 2],
-        "vehicle": [[1, 2, 3, 4], [1], [1], [2, 3], [3, 4], [3, 4]],
-        "next": [None, 2, 3, 4, None, None],
+        "vehicle": [[1, 2, 3, 4], [1], [1], [2, 3], [3, 4], [1]],
+        # "next": [None, 2, 3, 4, 5, None],
+        "next": [1, 2, None, None, None, None], # Only work if the quantity is same
     })
     input_data_worker = pd.DataFrame({
         "worker": list("ABCD"),
         "location": [[0, 2], [0, 1], [0, 2], [0, 1]],
-        "vehicle": [[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]],
+        "vehicle": [[1 ], [1, 2, 3, 4], [1], [1, 2, 3, 4]],
+    })
+    input_data_location = pd.DataFrame({
+        "location": list(range(3)),
+        "decay_rate": [1, 1, 1],  # per shift
+        "capacity": [10, 20, 30],
     })
         # "location": [[0, 2], [0, 1], [0, 2], [0, 1]],
     # input_data = pd.DataFrame(input_data)
     print(input_data)
     print(input_data_worker)
-    # df = input_data
-    package_to_keiro = pd.crosstab(index=input_data['package'], columns = input_data['location']).to_numpy()
-    package_to_vehicle = pd.DataFrame({p: [1 if v in vehicles_list else 0 for v in range(4)] for p, vehicles_list in enumerate(input_data.vehicle)}).T.to_numpy()   # num_vehicle = 4
-    keiro_to_worker = pd.DataFrame({p: [1 if v in worker_list else 0 for v in range(3)] for p, worker_list in enumerate(input_data_worker.location)}).to_numpy()   # num_keiro = 6
-    # print("package_to_vehicle",package_to_vehicle)
-    # package_orders = [[i, next_i] if next_i is not None for (i, next_i) in zip(input_data.package, input_data)]
-    package_orders = [[i,int(next_i)]  for (i, next_i) in zip(input_data.package, input_data.next) if pd.notna(next_i)]
-    # package_orders = [next_i  for next_i in input_data.next if pd.notna(next_i)]
     print()
     printj.yellow('::::::::::::::::::: preprocess :::::::::::::::::::')
-    print("package_to_vehicle", package_to_vehicle)
-    print("package_to_keiro", package_to_keiro)
-    print("keiro_to_worker", keiro_to_worker)
-    print("package_orders", package_orders)
+    package_to_keiro = pd.crosstab(index=input_data['package'], columns = input_data['location']).to_numpy()
+    package_to_vehicle = pd.DataFrame({p: [1 if (v+1) in vehicles_list else 0 for v in range(4)] for p, vehicles_list in enumerate(input_data.vehicle)}).T.to_numpy()   # num_vehicle = 4
+    worker_to_vehicle = pd.DataFrame({p: [1 if (v+1) in vehicles_list else 0 for v in range(4)] for p, vehicles_list in enumerate(input_data_worker.vehicle)}).T.to_numpy()   # num_vehicle = 4
+    keiro_to_worker = pd.DataFrame({p: [1 if v in worker_list else 0 for v in range(3)] for p, worker_list in enumerate(input_data_worker.location)}).to_numpy()   # num_keiro = 6
+    package_orders = [[i,int(next_i)]  for (i, next_i) in zip(input_data.package, input_data.next) if pd.notna(next_i)]
+    print("package_to_vehicle\n", package_to_vehicle)
+    print("worker_to_vehicle\n", worker_to_vehicle)
+    print("package_to_keiro\n", package_to_keiro)
+    print("keiro_to_worker\n", keiro_to_worker)
+    print("package_orders\n", package_orders)
+    print()
     print()
     # print(package_to_keiro.to_numpy())
     # sys.exit()
@@ -196,6 +201,7 @@ def main():
     all_shifts = range(num_shifts)
     all_vehicles = range(num_vehicles)
 
+    # print(all_vehicles)
     print(
         f'\nNo. of package  {num_packages}, No. of workers  {num_workers}')
     alphabets = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -216,17 +222,22 @@ def main():
     # package_to_worker = np.matmul(package_to_keiro, workers_to_keiro.T)
     # print(package_to_keiro.shape, keiro_to_worker.shape)
     package_to_worker = np.matmul(package_to_keiro, keiro_to_worker)
-    available_workers_per_package = [
-        [i for i, ll in enumerate(l) if ll == 1] for l in package_to_worker]
-    available_vehicles_per_package = [
-        [i for i, ll in enumerate(l) if ll == 1] for l in package_to_vehicle]
+    available_workers_per_package = [[i for i, ll in enumerate(l) if ll == 1] for l in package_to_worker]
+    available_vehicles_per_package = [[i for i, ll in enumerate(l) if ll == 1] for l in package_to_vehicle]
+    available_vehicles_per_worker = [[i for i, ll in enumerate(l) if ll == 1] for l in worker_to_vehicle]
 
+    # print()
+    # for p, item in enumerate(available_workers_per_package):
+    #     text_worker = ct.green(
+    #         f'workers {"".join(alphabets[l] for l in item)}')
+    #     text_package = ct.cyan(f'Package-{p}')
+    #     print(f'{text_package} can be moved by {text_worker}')
     print()
-    for p, item in enumerate(available_workers_per_package):
+    for w, item in enumerate(available_vehicles_per_worker):
         text_worker = ct.green(
-            f'workers {"".join(alphabets[l] for l in item)}')
-        text_package = ct.cyan(f'Package-{p}')
-        print(f'{text_package} can be moved by {text_worker}')
+            f'vehicle {", ".join(f"{l+1}" for l in item)}')
+        text_package = ct.cyan(f'worker {alphabets[w]}')
+        print(f'{text_package} can use {text_worker}')
     print()
     # for p, item in enumerate(available_vehicles_per_package):
     #     text_vehicle = ct.yellow(
@@ -243,7 +254,7 @@ def main():
         print(f'{text_package} can be moved by \t{text_worker}\tusing {text_vehicle}')
     print()
 
-    vehicle_to_worker = np.matmul(package_to_vehicle.T, package_to_worker)
+    # vehicle_to_worker = np.matmul(package_to_vehicle.T, package_to_worker)
     # sys.exit()
     # Creates the model.
     model = cp_model.CpModel()
@@ -256,18 +267,72 @@ def main():
             for v in all_vehicles:
                 for s in all_shifts:
                     shifts[(w, p, v, s)] = model.NewBoolVar(
-                        'shift_w%ip%ik%is%i' % (w, p, v, s))
+                        'shift_w%ip%iv%is%i' % (w, p, v, s))
 
-    # 1 worker needed per package
-    for p in all_packages:
+    package_quantity = 3
+    for pi, p in enumerate(all_packages):
+        package_quantity = input_data.quantity[pi]
+        # 1 worker needed per package
+        
         model.Add(sum(sum(sum(shifts[(w, p, v, s)] for v in all_vehicles)
-                  for s in all_shifts) for w in all_workers) == 1)
+                  for s in all_shifts) for w in all_workers) == package_quantity)
+        # 1 available worker per package
         model.Add(sum(sum(sum(shifts[(w, p, v, s)] for v in all_vehicles)
-                  for s in all_shifts) for w in available_workers_per_package[p]) == 1)
-
+                  for s in all_shifts) for w in available_workers_per_package[p]) == package_quantity)
+        # 1 available vehicle per package
         model.Add(sum(sum(sum(shifts[(w, p, v, s)] for w in all_workers)
-                  for s in all_shifts) for v in available_vehicles_per_package[p]) == 1)
+                  for s in all_shifts) for v in available_vehicles_per_package[p]) == package_quantity)
+        
+        for s in all_shifts:
+            model.Add(sum(sum(shifts[(w, p, v, s)] for v in all_vehicles) for w in all_workers) <= 1)
 
+    for s in all_shifts:
+        for w in all_workers:
+            for v in all_vehicles:
+                model.Add(sum(shifts[(w, p, v, s)] for p in all_packages) <= 1)
+
+    # for s in all_shifts:
+    #     model.Add(sum(sum(sum(shifts[(w, p, v, s)] for v in all_vehicles)
+    #               for p in all_packages) for w in all_workers) == 1)
+        # model.Add(sum(sum(sum(shifts[(w, p, v, s)] for v in available_vehicles_per_worker[w])
+        #           for s in all_shifts) for w in all_workers) == package_quantity)
+        # sum_shift_val += sum([sum([sum([s if shifts[(w, p, v, s)]==1 else 0 for v in all_vehicles]) for s in all_shifts]) for w in all_workers])
+    # t=0
+    # t1=4
+    # sum_shift_val = 0
+    # for p in all_packages:
+    #     for s in all_shifts:
+    #         for w in all_workers:
+    #             for v in all_vehicles:
+    #                 t1 = t
+    #                 t += shifts[(w, p, v, s)]
+                    
+    #                 if t > t1:
+    #                     pass
+    #     print(sum_shift_val)
+    # model.Minimize(sum_shift_val)
+    # for p in all_packages:
+    #     for s in all_shifts:
+    #         for w in all_workers:
+    #             for v in all_vehicles:
+    #                 if shifts[(w, p, v, s)]:
+    #                     sum_shift_val += s
+    # model.Minimize(sum_shift_val)
+    # """
+    printj.red(f'all_vehicles: {list(all_vehicles)}')
+    printj.red(f'available_vehicles_per_worker: {available_vehicles_per_worker}')
+    for w in all_workers:
+        for v in all_vehicles:
+        # 1 available vehicle per worker
+            if v in available_vehicles_per_worker[w]:
+                model.Add(sum(sum(shifts[(w, p, v, s)] for p in all_packages)
+                        for s in all_shifts) >= 0)
+            else:
+                model.Add(sum(sum(shifts[(w, p, v, s)] for p in all_packages)
+                        for s in all_shifts) == 0)
+    # """
+
+    # """
     #  package_order   # s(p=2) < s(p=4)
     for package_order in package_orders:
         shift_before = 0
@@ -277,48 +342,23 @@ def main():
                     # s = {0, 1, 2, 3}
                     shift_before += shifts[(w, package_order[0], v, s)]
                     shift_after = 0
-                    for s2 in range(s, num_shifts):
-                        for w2 in all_workers:
-                            for k2 in all_vehicles:
-                                # (4 - {0, 1, 2, 3})
-                                shift_after += shifts[(w2,
-                                                       package_order[1], k2, s2)]
-                    model.Add(shift_before <= shift_after)
-                    # print(ct.yellow(f'{package_order} ')+ct.cyan(f'shift_before: ')+f'{shift_before}, '+ct.green('shift_after: ')+f'{shift_after}')
+                    # for s2 in range(s, num_shifts):
+                    for s2 in range(s+2):
+                        if s2 < num_shifts:
+                            for w2 in all_workers:
+                                for v2 in all_vehicles:
+                                    # (4 - {0, 1, 2, 3})
+                                    shift_after += shifts[(w2, package_order[1], v2, s2)]
+                    # model.Add(shift_before <= shift_after)
+                    model.Add(shift_before <= shift_after).OnlyEnforceIf(shifts[(w, package_order[0], v, s)])
+                    model.Add(shift_before >= shift_after).OnlyEnforceIf(shifts[(w, package_order[1], v, s)])
 
-# 0, 1, 2, 3, 4, 5
-# s(p=2) < s(p=4)
-
-# abc
-# d
-        # model.Add(sum(sum(shifts[(w, p, v, s)] for s in all_shifts) for w in available_workers_per_package[p]) == 1)
-    # # Each nurse works at most one shift per package.
-    # for n in all_workers:
-    #     for d in all_packages:
-    #         model.Add(sum(shifts[(w, p, v, s)] for s in all_shifts) <= 1)
-
-    # # Try to distribute the shifts evenly, so that each nurse works
-    # # min_shifts_per_nurse shifts. If this is not possible, because the total
-    # # number of shifts is not divisible by the number of workers, some workers will
-    # # be assigned one more shift.
-    # min_shifts_per_nurse = (num_shifts * num_packages) // num_workers
-    # if num_shifts * num_packages % num_workers == 0:
-    #     max_shifts_per_nurse = min_shifts_per_nurse
-    # else:
-    #     max_shifts_per_nurse = min_shifts_per_nurse + 1
-    # for n in all_workers:
-    #     num_shifts_worked = 0
-    #     for d in all_packages:
-    #         for s in all_shifts:
-    #             num_shifts_worked += shifts[(w, p, v, s)]
-    #     model.Add(min_shifts_per_nurse <= num_shifts_worked)
-    #     model.Add(num_shifts_worked <= max_shifts_per_nurse)
 
     # Creates the solver and solve.
     solver = cp_model.CpSolver()
     solver.parameters.linearization_level = 0
     # Display the first five solutions.
-    a_few_solutions = 1
+    a_few_solutions = 30
     solution_printer = WorkersPartialSolutionPrinter(shifts, num_workers,
                                                      num_packages, num_shifts,
                                                      num_vehicles,
