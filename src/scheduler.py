@@ -46,7 +46,15 @@ class TimeVar:
 #     return unique_list
 
 class Scheduler:
-    def __init__(self, input_data_package, input_data_worker, input_data_location,
+    def __init__(self) -> None:
+        # pass
+        self.input_data_package = None
+        self.input_data_worker = None
+        self.input_data_location = None
+        self.time_shifts = None
+        self.num_vehicles = None
+
+    def __call__(self, input_data_package, input_data_worker, input_data_location,
         time_shifts,
         num_vehicles: int = 4, ):
         self.input_data_package = input_data_package
@@ -55,8 +63,13 @@ class Scheduler:
         self.time_shifts = time_shifts
         self.num_vehicles = num_vehicles
 
+        self.input_data_package.dropna(subset = ["package"], inplace=True)
+        self.input_data_package.dropna(axis=1, how='all')
+        self.input_data_package_orig, self.input_data_worker_orig, self.input_data_location_orig = self.input_data_package.copy(
+        ), self.input_data_worker.copy(), self.input_data_location.copy()
 
-    def solution_printer(self, shifts):
+
+    def solution_printer(self):
 
         alphabets = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         """
@@ -69,7 +82,7 @@ class Scheduler:
                 for w in range(num_workers):
                     is_working = False
                     for v in range(num_vehicles):
-                        if solver.Value(shifts[(w, p, v, s)]) == 1:
+                        if solver.Value(self.shifts[(w, p, v, s)]) == 1:
                             is_working = True
                             # print('  Worker %i works shift %i' % (w, s))
                             text_worker = ct.green(
@@ -102,21 +115,21 @@ class Scheduler:
                 for w in range(self.num_workers):
                     is_working = False
                     for v in range(self.num_vehicles):
-                        # print("self.solver.Value(shifts[(w, p, v, s)])", self.solver.Value(shifts[(w, p, v, s)]))
-                        if self.solver.Value(shifts[(w, p, v, s)]) == 1:
-                            is_working = True
-                            # print('  Worker %i works shift %i' % (w, s))
-                            text_worker = f'Worker {alphabets[w]}'
-                            # text_shift = ct.purple(f'shift {["9:00", "10:00", "11:00", "12:00", ][s]}')
-                            text_shift = f'shift {self.time_shifts[s]}'
-                            # text_shift = ct.purple(f'shift {s}')
-                            text_package = f'package-{p}'
-                            text_vehicle = f'vehicle {v+1}'
-                            # text_keiro = ct.yellow(
-                            #     f'keiro {["Main2", "Main1", "SUB", ][v]}')
-                            # if p in [2, 4]:
-                            # print(
-                            #     f'  {text_worker} at {text_shift} moves {text_package} using {text_vehicle}')
+                        # print("self.solver.Value(self.shifts[(w, p, v, s)])", self.solver.Value(self.shifts[(w, p, v, s)]))
+                        if self.solver.Value(self.shifts[(w, p, v, s)]) == 1:
+                            # is_working = True
+                            # # print('  Worker %i works shift %i' % (w, s))
+                            # text_worker = f'Worker {alphabets[w]}'
+                            # # text_shift = ct.purple(f'shift {["9:00", "10:00", "11:00", "12:00", ][s]}')
+                            # text_shift = f'shift {self.time_shifts[s]}'
+                            # # text_shift = ct.purple(f'shift {s}')
+                            # text_package = f'package-{p}'
+                            # text_vehicle = f'vehicle {v+1}'
+                            # # text_keiro = ct.yellow(
+                            # #     f'keiro {["Main2", "Main1", "SUB", ][v]}')
+                            # # if p in [2, 4]:
+                            # # print(
+                            # #     f'  {text_worker} at {text_shift} moves {text_package} using {text_vehicle}')
                             s_val = f'{alphabets[w]}{v+1} '
                             num_packages_moved += 1
                 data_i.append(s_val)
@@ -129,25 +142,25 @@ class Scheduler:
         data = pd.DataFrame(data, columns=[f'  {s}' for s in self.time_shifts])
 
         data_moved = pd.DataFrame(data_moved, columns=['moved', 'not_moved', 'q_at_destination'])
-        print(data_moved)
+        # print(data_moved)
         
-        data = pd.concat([
+        self.input_data_package_orig = pd.concat([
+            self.input_data_package_orig[['package', 'quantity', 'decay',
+                                'location', 'vehicle', 'next', 'yesterday']],
             data,
-            data_moved], axis=1)
-        data.index = [f'Package-{p}' for p in range(self.num_packages)]
-        print()
-        print(data)
-        return data
+            data_moved], axis=1).copy()
+        # data.index = [f'Package-{p}' for p in range(self.num_packages)]
+        # self.data = self.data.reset_index(drop=True)
+        # self.data.dropna(axis=1, how='any')
+        self.data = self.input_data_package_orig.copy()
+        # print()
+        print(self.data)
+        return self.data
 
 
     def solution_writer(self):
         output_path = 'test/xl.xlsx'
         print()
-        self.output_data = self.output_data.reset_index(drop=True)
-        self.input_data_package_orig = pd.concat([
-            self.input_data_package_orig[['package', 'quantity', 'decay',
-                                'location', 'vehicle', 'next', 'yesterday']],
-            self.output_data], axis=1)
         print(self.input_data_package_orig)
         # Create a Pandas Excel writer using XlsxWriter as the engine.
         writer = pd.ExcelWriter(output_path, engine='xlsxwriter')
@@ -177,21 +190,21 @@ class Scheduler:
         #     [1, 1, 1, 1, 0, 1],
         #     [1, 1, 1, 1, 1, 0],
         #     ]
-        self.input_data_package.dropna(subset = ["package"], inplace=True)
-        self.input_data_package_orig, self.input_data_worker_orig, self.input_data_location_orig = self.input_data_package.copy(
-        ), self.input_data_worker.copy(), self.input_data_location.copy()
         printj.yellow('::::::::::::::::::: preprocess :::::::::::::::::::')
 
         print(self.input_data_package)
-        self.input_data_package.vehicle = [
-            [int(i) for i in v.split(",")] for v in self.input_data_package.vehicle]
-        self.input_data_package.next = [v if isinstance(
-            v, int) else None for v in self.input_data_package.next]
-        self.input_data_worker.location = [
-            [int(i) for i in v.split(",")] for v in self.input_data_worker.location]
-        self.input_data_worker.vehicle = [
-            [int(i) for i in v.split(",")] for v in self.input_data_worker.vehicle]
-        self.num_locations = len(self.input_data_location.location)
+        print(self.input_data_package.dtypes)
+        if isinstance(self.input_data_package.vehicle[0], str): 
+            self.input_data_package.vehicle = [
+                [int(i) for i in v.split(",")] for v in self.input_data_package.vehicle]
+            self.input_data_package.next = [v if isinstance(
+                v, int) else None for v in self.input_data_package.next]
+        if isinstance(self.input_data_worker.location[0], str): 
+            self.input_data_worker.location = [
+                [int(i) for i in v.split(",")] for v in self.input_data_worker.location]
+            self.input_data_worker.vehicle = [
+                [int(i) for i in v.split(",")] for v in self.input_data_worker.vehicle]
+            self.num_locations = len(self.input_data_location.location)
         # package_to_location = pd.crosstab(
         #     index=self.input_data_package['package'], columns=self.input_data_package['location']).to_numpy()
         package_to_location = pd.DataFrame({p: [1 if l in [location_list] else 0 for l in range(self.num_locations)]
@@ -318,13 +331,13 @@ class Scheduler:
         model = cp_model.CpModel()
 
         # Creates shift variables.
-        # shifts[(w, p, v, s)]: nurse 'n' works shift 's' on package 'd'.
-        shifts = {}
+        # self.shifts[(w, p, v, s)]: nurse 'n' works shift 's' on package 'd'.
+        self.shifts = {}
         for w in all_workers:
             for p in all_packages:
                 for v in all_vehicles:
                     for s in all_shifts:
-                        shifts[(w, p, v, s)] = model.NewBoolVar(
+                        self.shifts[(w, p, v, s)] = model.NewBoolVar(
                             'shift_w%ip%iv%is%i' % (w, p, v, s))
         package_quantity = 1
         for pi, p in enumerate(all_packages):
@@ -333,17 +346,17 @@ class Scheduler:
             # package_quantity = min(package_quantity, )
             # 1 worker needed per package
 
-            model.Add(sum(sum(sum(shifts[(w, p, v, s)] for v in all_vehicles)
+            model.Add(sum(sum(sum(self.shifts[(w, p, v, s)] for v in all_vehicles)
                     for s in all_shifts) for w in all_workers) <= package_quantity)
             # 1 available worker per package
-            model.Add(sum(sum(sum(shifts[(w, p, v, s)] for v in all_vehicles)
+            model.Add(sum(sum(sum(self.shifts[(w, p, v, s)] for v in all_vehicles)
                     for s in all_shifts) for w in available_workers_per_package[p]) <= package_quantity)
             # 1 available vehicle per package
-            model.Add(sum(sum(sum(shifts[(w, p, v, s)] for w in all_workers)
+            model.Add(sum(sum(sum(self.shifts[(w, p, v, s)] for w in all_workers)
                     for s in all_shifts) for v in available_vehicles_per_package[p]) <= package_quantity)
 
             for s in all_shifts:
-                model.Add(sum(sum(shifts[(w, p, v, s)]
+                model.Add(sum(sum(self.shifts[(w, p, v, s)]
                         for v in all_vehicles) for w in all_workers) <= 1)
 
         # Capacity constraints
@@ -351,7 +364,7 @@ class Scheduler:
         for l in all_locations:
             # total_quantity = sum(self.input_data_package.quantity[p] for p in available_packages_per_location[l])
             # print(total_quantity)
-            # location_filled[l] += sum(sum(sum(sum(shifts[(w, p, v, s)]for v in all_vehicles) for s in all_shifts) for w in all_workers) for p in available_packages_per_location[l])
+            # location_filled[l] += sum(sum(sum(sum(self.shifts[(w, p, v, s)]for v in all_vehicles) for s in all_shifts) for w in all_workers) for p in available_packages_per_location[l])
             capacity = self.input_data_location.capacity[l]
             # decay = self.input_data_location.decay[l]
             # current_empty_space = capacity #  10 = 3 nimotsu + 7 empty_space = 2 nimotsu + 8 empty_space = 10 empty_space
@@ -360,13 +373,13 @@ class Scheduler:
             # model.Add(location_filled[l]==empty_space)
             for si in all_shifts:
                 for p in available_packages_per_location[l]:
-                    constant = 1  # Use/ change when decay is a fraction like 0.5
+                    constant = 4  # Use/ change when decay is a fraction like 0.5
                     decay = self.input_data_package.decay[p]*constant
-                    # sum_package = sum(sum(sum(sum(shifts[(w, p, v, s)]for v in all_vehicles) for w in all_workers) for s in range(si+1)))
-                    sum_package = sum(sum(sum(shifts[(
+                    # sum_package = sum(sum(sum(sum(self.shifts[(w, p, v, s)]for v in all_vehicles) for w in all_workers) for s in range(si+1)))
+                    sum_package = sum(sum(sum(self.shifts[(
                         w, p, v, s)]for v in all_vehicles) for w in all_workers) for s in range(si+1))
                     sum_package += self.input_data_package.yesterday[p]
-                    model.Add(sum_package*constant-decay*(si+1) <= capacity*constant)
+                    model.Add(sum_package*constant-int(decay)*(si+1) <= capacity*constant)
                     model.Add(sum_package-decay*(si+1)*constant >= 0)
                     # print(capacity, sum_package, decay*(si+1))
                     # print()
@@ -375,7 +388,7 @@ class Scheduler:
         for s in all_shifts:
             for w in all_workers:
                 for v in all_vehicles:
-                    model.Add(sum(shifts[(w, p, v, s)] for p in all_packages) <= 1)
+                    model.Add(sum(self.shifts[(w, p, v, s)] for p in all_packages) <= 1)
 
         printj.red(f'all_vehicles: {list(all_vehicles)}')
         printj.red(
@@ -384,10 +397,10 @@ class Scheduler:
             for v in all_vehicles:
                 # 1 available vehicle per worker
                 if v in available_vehicles_per_worker[w]:
-                    model.Add(sum(sum(shifts[(w, p, v, s)] for p in all_packages)
+                    model.Add(sum(sum(self.shifts[(w, p, v, s)] for p in all_packages)
                                 for s in all_shifts) >= 0)
                 else:
-                    model.Add(sum(sum(shifts[(w, p, v, s)] for p in all_packages)
+                    model.Add(sum(sum(self.shifts[(w, p, v, s)] for p in all_packages)
                                 for s in all_shifts) == 0)
 
         #  package_order   # s(p=2) < s(p=4)
@@ -397,7 +410,7 @@ class Scheduler:
                 for w in all_workers:
                     for v in all_vehicles:
                         # s = {0, 1, 2, 3}
-                        shift_before += shifts[(w, package_order[0], v, s)]
+                        shift_before += self.shifts[(w, package_order[0], v, s)]
                         shift_after = 0
                         # for s2 in range(s, num_shifts):
                         for s2 in range(s+2):
@@ -405,28 +418,29 @@ class Scheduler:
                                 for w2 in all_workers:
                                     for v2 in all_vehicles:
                                         # (4 - {0, 1, 2, 3})
-                                        shift_after += shifts[(w2,
+                                        shift_after += self.shifts[(w2,
                                                             package_order[1], v2, s2)]
                         # model.Add(shift_before <= shift_after)
                         model.Add(shift_before == shift_after).OnlyEnforceIf(
-                            shifts[(w, package_order[0], v, s)])
+                            self.shifts[(w, package_order[0], v, s)])
                         model.Add(shift_before == shift_after).OnlyEnforceIf(
-                            shifts[(w, package_order[1], v, s)])
+                            self.shifts[(w, package_order[1], v, s)])
 
         # # pylint: disable=g-complex-comprehension
         
-        objective = sum(sum(sum(sum(sum(shifts[(w, p, v, s)] for v in all_vehicles) for w in all_workers) for s in range(si+1)) for p in all_packages) for s in all_shifts)
+        objective = sum(sum(sum(sum(sum(self.shifts[(w, p, v, s)] for v in all_vehicles) for w in all_workers) for s in range(si+1)) for p in all_packages) for s in all_shifts)
         model.Maximize(objective)
 
         printj.yellow('::::::::::::::::::::: Output :::::::::::::::::::::')
         # Creates the solver and solve.
         self.solver = cp_model.CpSolver()
         self.status = self.solver.Solve(model)
-        if self.status == cp_model.OPTIMAL:
-            self.output_data = self.solution_printer(shifts)
-            self.solution_writer()
-        else:
-            print("No solutions")
+        
+        # if self.status == cp_model.OPTIMAL:
+        #     self.output_data = self.solution_printer()
+        #     self.solution_writer()
+        # else:
+        #     print("No solutions")
         # Statistics.
         print()
         print('Statistics')
@@ -443,7 +457,7 @@ class Scheduler:
         return y
 
 
-def main():
+def main(path = "test/xl.xlsx"):
 
     printj.yellow('::::::::::::::::::::: Input :::::::::::::::::::::')
     path = "test/xl.xlsx"
@@ -526,9 +540,15 @@ def main():
     print(input_data_worker)
     print(input_data_location)
     print()
-    Scheduler(input_data_package, input_data_worker, input_data_location,
+    scheduler = Scheduler(input_data_package, input_data_worker, input_data_location,
              time_shifts,
-             num_vehicles).run()
+             num_vehicles)
+    scheduler.run()
+    if scheduler.status == cp_model.OPTIMAL:
+        scheduler.output_data = scheduler.solution_printer()
+        scheduler.solution_writer()
+    else:
+        print("No solutions")
     
     # """
     """  
@@ -543,4 +563,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(path = "test/xl.xlsx")

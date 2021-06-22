@@ -34,3 +34,5 @@ class TimeVar:
 # print(f'{t} + {r} = {e}')
 
 print(list("ABCD"))
+
+print([(i , j) for i in range(3) for j in range(2)])
